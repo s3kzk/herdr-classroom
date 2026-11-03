@@ -16,8 +16,10 @@
 // The building is sized to the panel: its art shrinks in whole screen pixels, to half
 // the usual size at most, and its columns change, so that it fits whole when it can.
 //
-// Cost: everything is still pictures; working occupants move in steps on a slow
-// timer that runs only while someone works, so a quiet building doesn't redraw the window.
+// Cost: everything is still pictures. Every redraw of a mod redraws the whole window,
+// so an occupant hops only for the first seconds after it starts working, in steps
+// on a slow timer, then sits still; a building where nobody just started doesn't
+// redraw the window.
 // render reads spaces() and agents() once and builds the hovered roster only. Resizing
 // the panel redraws only when the size or columns picked for it change.
 import { View, div, svg, image } from "gpui-kit";
@@ -38,6 +40,9 @@ const clock = (ms) => { const d = new Date(ms); return `${d.getHours()}:${String
 
 // A room narrower than this cuts its name plate short.
 const MIN_TILE = 100;
+
+// How long an occupant hops after it starts working.
+const HOP_MS = 3000;
 
 const LABEL = { working: "Working", blocked: "Needs you", done: "Done", idle: "Idle" };
 const ORDER = { blocked: 0, done: 1, working: 2, idle: 3 };
@@ -96,10 +101,14 @@ export default class Rooms extends View {
     this.open = null;
     this.overTile = null;
     this.overCard = false;
-    // Working occupants move in steps, about 3 a second, and only while someone
-    // works. A native loop would redraw the whole window about 30 times a second.
+    // An occupant who starts working hops in steps, about 3 a second, for HOP_MS,
+    // then sits still. A native loop would redraw the whole window about 30 times
+    // a second, and even 3 steps a second cost as much as everything else idle.
     this.step = 0;
     this.busy = false;
+    // When each working agent started; the ones already working at the first render don't hop.
+    this.started = null;
+    this.hopping = () => false;
     cx.timer.every(320, (cx) => { if (this.busy) { this.step ^= 1; cx.notify(); } });
   }
 
@@ -274,7 +283,7 @@ export default class Rooms extends View {
   seat(a, p, c, dim) {
     const { u } = this;
     const kid = image(sprite(a, p)).w(19 * u).h(15 * u).when(dim, (el) => el.opacity(0.8));
-    const hop = status(a) === "working" ? (this.step ? 1 : -1) : 0;
+    const hop = this.hopping(a) ? (this.step ? 1 : -1) : 0;
     return div().relative().w(22 * u).h(17 * u).flex_none()
       .child(div().absolute().top(hop > 0 ? -2 * u : 0).left(1.5 * u + hop * u).child(kid))
       .child(div().absolute().top(11 * u).left(2.5 * u).w(17 * u).h(2 * u).bg(p.deskTop))
@@ -360,7 +369,11 @@ export default class Rooms extends View {
     const rooms = [...sp].sort((x, y) => filled(y) - filled(x) || changed(y) - changed(x) || recent(y) - recent(x) || x.index - y.index);
     const count = { blocked: 0, done: 0, working: 0, idle: 0 };
     for (const a of ag) count[status(a)] += 1;
-    this.busy = count.working > 0;
+    const now = Date.now(), was = this.started;
+    this.started = new Map();
+    for (const a of ag) if (status(a) === "working") this.started.set(a.address, was ? (was.get(a.address) ?? now) : 0);
+    this.hopping = (a) => status(a) === "working" && now - (this.started.get(a.address) ?? 0) < HOP_MS;
+    this.busy = ag.some(this.hopping);
 
     // A floor per row of windows (about one per 125 pixels of width, see fit); the
     // windows of a floor share the height of its fullest room.

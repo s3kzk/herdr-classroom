@@ -5,7 +5,10 @@ This product includes software derived from Herdr
 (https://github.com/herdrdev/herdr-app), Copyright the Herdr authors,
 licensed under the Apache License, Version 2.0:
 
-- mods/tabs-graph/ is a copy of Herdr 0.1.9's shipped `tabs` mod with a Graph button added.
+- mods/tabs-graph/ is a copy of Herdr 0.1.9's shipped `tabs` mod with a Graph button added
+  and its working spinner held still.
+- mods/agents-calm/ and mods/pane-calm/ are copies of Herdr 0.1.12's shipped `agents`
+  and `pane` mods with their working spinner held still.
 
 This product includes software from herdr-session-titles
 (https://github.com/choam2426/herdr-session-titles), Copyright 2026 choam2426,

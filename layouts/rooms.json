@@ -40,7 +40,7 @@
               "id": "agents",
               "type": "block",
               "content": {
-                "mod": "agents"
+                "mod": "agents-calm"
               },
               "size": {
                 "weight": 1
@@ -97,7 +97,7 @@
                 "pane": {
                   "header": {
                     "content": {
-                      "mod": "pane"
+                      "mod": "pane-calm"
                     },
                     "reveal": "always",
                     "height": 30,

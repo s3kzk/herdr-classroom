@@ -6,7 +6,7 @@ Your spaces are rooms in a pixel-art building, and every agent is an occupant si
 
 ## What you see
 
-- **Left sidebar, 268px:** the brand row (46px, shipped `workspace-chrome`), then the building and the agent list sharing the rest half and half, then the footer (69px, `workspace-chrome` with `{footer: true}`).
+- **Left sidebar, 268px:** the brand row (46px, shipped `workspace-chrome`), then the building and the agent list (`agents-calm`) sharing the rest half and half, then the footer (69px, `workspace-chrome` with `{footer: true}`).
 - **The building (`rooms` mod):**
   - A header row: counts per status (`Needs you`, `Done`, `Working`, `Idle`), `Day`/`Night`, and the building's name (a press lists the six buildings).
   - Under it the building art: a roof line and a clock tower or the building's own top, then floors of windows. One window is one space, with its name on a white plate above it.
@@ -14,12 +14,12 @@ Your spaces are rooms in a pixel-art building, and every agent is an occupant si
   - Each room shows one desk per agent with its occupant behind it. Desks hide the occupants below row 11 of their 19×15 sprite.
   - A window's top-right corner carries a red `!` badge when someone in it waits for you, or a blue check when someone finished.
   - Night (between sunset and sunrise, reckoned for the local time zone) darkens the sky; a room whose occupants all sleep turns its lights off.
-- **Right of it:** the shipped `pane` mod with the tabs bar above (`tabs-graph`, 42px, a copy of the shipped `tabs` with a Graph button) and the status bar below (`workspace-status`, 28px).
+- **Right of it:** the panes, each with a header (`pane-calm`), with the tabs bar above (`tabs-graph`, 42px, a copy of the shipped `tabs` with a Graph button) and the status bar below (`workspace-status`, 28px).
 - **Right panel, 368px:** a stack of the shipped `files` and `changes` mods and `git-graph` (see Watch out).
 
 ## How it behaves
 
-- **working:** yellow-or-other hard hat with a wrench and a sweat drop; the occupant hops between two spots about 3 times a second.
+- **working:** yellow-or-other hard hat with a wrench and a sweat drop; for its first 3 seconds of work the occupant hops between two spots about 3 times a second, then sits still.
 - **blocked:** eyes look up and a red `!` appears (Claw'd occupants also raise a hand); the room gets the red badge.
 - **done:** `^ ^` eyes, blush, confetti; the room gets the blue check.
 - **idle:** closed eyes, a starry nightcap, `Z` and a snot bubble.
@@ -35,6 +35,7 @@ Your spaces are rooms in a pixel-art building, and every agent is an occupant si
   - `sprites/<body>-<hat>-<status>.svg`: 15 bodies × 4 hat colors × 4 statuses = 240 pictures. Bodies are `claude` and `other` (Claw'd, recolored) and `codex`, `crush`, `kiro`, `pi`, `gemini`, `cursor`, `opencode`, `amp`, `grok`, `antigravity`, `kimi`, `qoder`, `hermes`.
   - An occupant's body comes from `program.key` of the agent (the program table folds names like `kiro-cli` into `kiro`), else from the agent's reported `app`.
   - `tools/`: the Python scripts that draw every SVG (`occupants.py`, `scene.py`, `buildings.py`; see `tools/README.md`).
+- `mods/agents-calm/` and `mods/pane-calm/`: the shipped `agents` and `pane` (0.1.12) cloned with `mod.clone`, their working spinner (`.spin(900)`) held still. `tabs-graph` holds its spinner still too.
 - `herdr` functions: `spaces()`, `agents()`, `theme()`, `settings()`, `props()`, `run("space.select" | "pane.focus")`, `openOverlay`, `exec` (menu only).
 - Programs it runs, from the right-click menu only: `git rev-parse`, `gh browse`, `open`, `open -a "Visual Studio Code"`, `pbcopy`.
 
@@ -42,13 +43,13 @@ Your spaces are rooms in a pixel-art building, and every agent is an occupant si
 
 - The right panel uses `git-graph`, which is not in this repo: add it from github.com/rabeeh-ta/herdr-git-graph, or drop the `graph` block from the layout.
 - The right-click menu is macOS-only (`open`, `pbcopy`, VS Code by app name).
-- Every picture is static; the only motion is the working hop on a 320ms timer that runs only while someone works. Don't add native loops or per-frame animation.
+- Every redraw of a mod redraws the whole window, so nothing here moves for long. Measured on Herdr 0.1.12 with 9 rooms and 14 agents: idle 1.2% CPU; a native `.spin()` or `.loop()` anywhere on screen, +9% to +23% while shown; the 320ms hop, +5% while it runs. Hence the still spinners and a hop of 3 seconds. Don't add native loops, spinners or per-frame animation.
 - Sprites are 19×15 with the face in rows 4–10: the desk hides rows 11 and below in the room, but the roster card shows the whole sprite.
 - GitHub Copilot agents show as the gray Claw'd (`other`) on purpose: GitHub asks for approval before its mascot is used in public.
 
 ## Done when
 
-- `herdr-app check mods/rooms` and `herdr-app check mods/tabs-graph` pass, and `layout.switch {name: "rooms"}` shows the building with no errors in `herdr-app status`.
+- `herdr-app check` passes for `mods/rooms`, `mods/tabs-graph`, `mods/agents-calm` and `mods/pane-calm`, and `layout.switch {name: "rooms"}` shows the building with no errors in `herdr-app status`.
 - With agents running, each sits in its space's room, dressed for its status, and the counts in the header match the agent list.
 - Resizing the panel changes the art size or the columns without errors; opening `Empty N` lets the panel scroll.
 - `python3 -I tools/occupants.py sprites` regenerates `sprites/` byte for byte.
