@@ -1,5 +1,5 @@
 # 校舎（school）の静止画の部品（時計塔・木・空の飾り）を昼と夜の 2 柄で生成する。
-#   python3 -I scene.py <mods/classroom/icons>
+#   python3 -I scene.py <mods/rooms/icons>
 import sys, os
 out = sys.argv[1]
 def svg(rows, pal, name):

@@ -1,4 +1,4 @@
-// A classroom's right-click menu, opened as a popup overlay of this mod
+// A room's right-click menu, opened as a popup overlay of this mod
 // (props { role: "menu", space }). ↑/↓ move, Enter runs, Esc closes.
 // An item is { label, icon, run, line? }; `line` draws a separator above it.
 import { div, svg } from "gpui-kit";
@@ -80,7 +80,7 @@ export class Menu {
 
   render() {
     const t = theme(), list = this.items();
-    return v_flex().id("classroom-menu").track_focus(this.handle).w_full().min_h(0).p(5).bg(t.popover).text_size(12.8)
+    return v_flex().id("rooms-menu").track_focus(this.handle).w_full().min_h(0).p(5).bg(t.popover).text_size(12.8)
       .on_key_down((e, cx) => {
         if (!list.length) return;
         if (e.key === "down") this.at = (this.at + 1) % list.length;

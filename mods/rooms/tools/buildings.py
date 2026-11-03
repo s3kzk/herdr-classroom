@@ -1,6 +1,6 @@
-# 教室 mod の建物ごとの静止画（空・屋上・入口まわりの飾り）を生成し、
+# rooms mod の建物ごとの静止画（空・屋上・入口まわりの飾り）を生成し、
 # icons/ にある全 SVG の大きさを art.js に書き出す。
-#   python3 -I buildings.py <mods/classroom>
+#   python3 -I buildings.py <mods/rooms>
 import sys, os, re, math
 
 root = sys.argv[1]

@@ -12,7 +12,7 @@ import { ART } from "./art.js";
 
 const pic = (name, s) => {
   const [w, h] = ART[name];
-  return image(`mods/classroom/icons/${name}.svg`).w(w * s).h(h * s);
+  return image(`mods/rooms/icons/${name}.svg`).w(w * s).h(h * s);
 };
 const times = (n, f) => Array.from({ length: n }, (_, i) => f(i));
 const tall = (name) => ART[name][1];

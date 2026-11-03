@@ -1,4 +1,4 @@
-herdr-classroom
+herdr-rooms
 Copyright 2026 s3kzk
 
 This product includes software derived from Herdr
@@ -11,8 +11,8 @@ This product includes software from herdr-session-titles
 (https://github.com/choam2426/herdr-session-titles), Copyright 2026 choam2426,
 licensed under the Apache License, Version 2.0:
 
-- mods/classroom/session.js is based on that project's session-title parser.
+- mods/rooms/session.js is based on that project's session-title parser.
 
-The student sprites for agents other than Claude Code are pixel art drawn after
+The occupant sprites for agents other than Claude Code are pixel art drawn after
 the agent icons Herdr ships (from LobeHub icons, MIT, and the agents' own marks).
 The names and marks belong to their owners; no trademark rights are granted.

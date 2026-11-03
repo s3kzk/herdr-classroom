@@ -29,7 +29,7 @@
               "id": "spaces",
               "type": "block",
               "content": {
-                "mod": "classroom"
+                "mod": "rooms"
               },
               "size": {
                 "weight": 1

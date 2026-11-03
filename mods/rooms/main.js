@@ -1,23 +1,23 @@
-// Spaces as rooms in a building, agents as the students in them: Claw'd, or the
-// agent's own character drawn from Herdr's icons (see tools/students.py). The header
+// Spaces as rooms in a building, agents as the people in them: Claw'd, or the
+// agent's own character drawn from Herdr's icons (see tools/occupants.py). The header
 // shows the time of day (day from sunrise to sunset, by the clock) and the building (a
 // press lists them: a school, an apartment, a hotel, a submarine, a rocket, a castle;
 // looks.js draws each). A floor of windows per row of rooms, rooms with agents first
 // and the most recently changed first within each; the rooms without agents sit under
 // a plate that folds them away or shows them all. Through each window, a desk per
-// agent with its student sitting at it, dressed for its status (hard hat and wrench
+// agent with its occupant sitting at it, dressed for its status (hard hat and wrench
 // while working, a hand up or a big "!" while it waits for you, confetti when done,
-// a nightcap and a snot bubble while idle). At night a room whose students all sleep
+// a nightcap and a snot bubble while idle). At night a room whose occupants all sleep
 // goes dark.
 // The window's shoulder carries a warning (someone waits for you) or a check
-// (someone finished). Resting the pointer on a window lists its students; a click
+// (someone finished). Resting the pointer on a window lists its occupants; a click
 // goes to the space or the agent.
 //
 // The building is sized to the panel: its art shrinks in whole screen pixels, to half
 // the usual size at most, and its columns change, so that it fits whole when it can.
 //
-// Cost: everything is still pictures; working students move in steps on a slow
-// timer that runs only while someone works, so a quiet school doesn't redraw the window.
+// Cost: everything is still pictures; working occupants move in steps on a slow
+// timer that runs only while someone works, so a quiet building doesn't redraw the window.
 // render reads spaces() and agents() once and builds the hovered roster only. Resizing
 // the panel redraws only when the size or columns picked for it change.
 import { View, div, svg, image } from "gpui-kit";
@@ -61,7 +61,7 @@ function body(a) {
 }
 const status = (a) => a.status ?? "idle";
 // The same agent keeps the same hat color.
-const sprite = (a) => `mods/classroom/sprites/${body(a)}-${pick(ACC, a.address)}-${status(a)}.svg`;
+const sprite = (a) => `mods/rooms/sprites/${body(a)}-${pick(ACC, a.address)}-${status(a)}.svg`;
 
 // The name a person gave the tab first, else the session the agent is on, else its program.
 function nameOf(a, tabs) {
@@ -70,9 +70,9 @@ function nameOf(a, tabs) {
   return session(a) || a.program?.name || a.app || "Agent";
 }
 
-export default class Classroom extends View {
+export default class Rooms extends View {
   init(_props, cx) {
-    // This mod also draws a classroom's right-click menu, as a popup.
+    // This mod also draws a room's right-click menu, as a popup.
     if (props()?.role === "menu") { this.part = new Menu(); this.part.init(cx); return; }
     this.building = "school";
     try {
@@ -92,11 +92,11 @@ export default class Classroom extends View {
     this.box = null;
     this.fitIn = null;
     this.fitted = null;
-    // The roster shown: only the hovered classroom's is built.
+    // The roster shown: only the hovered room's is built.
     this.open = null;
     this.overTile = null;
     this.overCard = false;
-    // Working students move in steps, about 3 a second, and only while someone
+    // Working occupants move in steps, about 3 a second, and only while someone
     // works. A native loop would redraw the whole window about 30 times a second.
     this.step = 0;
     this.busy = false;
@@ -211,7 +211,7 @@ export default class Classroom extends View {
       .text_size(11).text_color(t.muted).hover((st) => st.bg(t.hover).text_color(t.foreground));
     const time = h_flex().id("time").h(20).px(6).gap(5).items_center().text_size(11).text_color(t.dim)
       .tooltip(`Sunrise ${clock(this.sun[0])} · Sunset ${clock(this.sun[1])}`)
-      .child(svg(`mods/classroom/icons/time-${this.time}.svg`).size(11)).child(this.time === "night" ? "Night" : "Day");
+      .child(svg(`mods/rooms/icons/time-${this.time}.svg`).size(11)).child(this.time === "night" ? "Night" : "Day");
     const name = BUILDING_LIST.find((b) => b.key === this.building)?.name ?? "";
     const trigger = label("building").when(this.picking, (el) => el.bg(t.selected).text_color(t.foreground))
       .on_hover((h, cx) => { this.overPick = h; if (!h) this.closePickSoon(cx); })
@@ -248,14 +248,14 @@ export default class Classroom extends View {
   }
 
   // The right-click menu: what it offers is looked up first, as its height depends on it.
-  // No roster over the menu: none opens on this classroom until the pointer leaves it.
+  // No roster over the menu: none opens on this room until the pointer leaves it.
   openMenu(s, cx) {
     this.open = null;
     this.quiet = s.id;
     cx.notify();
     cx.spawn(async () => {
       const info = await probe(s);
-      openOverlay({ mod: "classroom", kind: "popup", width: MENU_WIDTH, height: menuHeight(menuItems(s, info)), props: { role: "menu", space: s.id, info } });
+      openOverlay({ mod: "rooms", kind: "popup", width: MENU_WIDTH, height: menuHeight(menuItems(s, info)), props: { role: "menu", space: s.id, info } });
     });
   }
 
@@ -266,10 +266,10 @@ export default class Classroom extends View {
     if (!waits && !done) return null;
     return h_flex().absolute().top(-9).right(-9).size(20).rounded(10).items_center().justify_center()
       .bg(waits ? t.blocked : t.done).border(2).border_color(t.chrome)
-      .child(svg(`mods/classroom/icons/${waits ? "warn" : "check"}.svg`).size(12).text_color("#ffffff"));
+      .child(svg(`mods/rooms/icons/${waits ? "warn" : "check"}.svg`).size(12).text_color("#ffffff"));
   }
 
-  // A student sitting at a desk: the desk hides its legs, its arms rest on it.
+  // An occupant sitting at a desk: the desk hides its legs, its arms rest on it.
   // A working one hops between two spots on each step of the timer (see init).
   seat(a, p, c, dim) {
     const { u } = this;
@@ -287,7 +287,7 @@ export default class Classroom extends View {
   }
 
   // A room: its name plate over a window dressed by the building (looks.js), its
-  // students at their desks inside.
+  // occupants at their desks inside.
   tile(s, list, tabs, p, t, roomH) {
     const { u } = this, w = p.win;
     const lit = !p.off || list.some((a) => status(a) !== "idle");
@@ -363,7 +363,7 @@ export default class Classroom extends View {
     this.busy = count.working > 0;
 
     // A floor per row of windows (about one per 125 pixels of width, see fit); the
-    // windows of a floor share the height of its fullest classroom.
+    // windows of a floor share the height of its fullest room.
     const full = rooms.filter((s) => filled(s));
     const empty = rooms.slice(full.length);
     this.fitIn = { full: full.map((s) => by.get(s.id).length), empty: empty.length, inset: house.inset, h: rise(p), z };
@@ -398,7 +398,7 @@ export default class Classroom extends View {
 
     return v_flex().id("root").size_full().min_h(0).min_w(0)
       .child(header)
-      .child(v_flex().id("school").flex_1().min_h(0).overflow_y_scrollbar()
+      .child(v_flex().id("building").flex_1().min_h(0).overflow_y_scrollbar()
         .on_size_change((size, cx) => this.resized(size, cx))
         .child(v_flex().w_full().px(8).pb(10).child(house.crown(p, u, ins)).child(wall).child(house.base(p, u, ins))));
   }
