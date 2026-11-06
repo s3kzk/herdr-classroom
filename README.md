@@ -1,9 +1,12 @@
 # herdr-rooms
 
 A [Herdr](https://herdr.dev) layout that draws your spaces as rooms in a pixel-art building.
-Every agent sits at a desk in its room, dressed for what it is doing.
+Every agent sits in its room, dressed for what it is doing: at a desk, on a sofa, in a ryokan,
+or soaking in a bathhouse tub under Mount Fuji.
 
-![Rooms](preview.png)
+![Rooms across the top, at a ryokan under Mount Fuji](preview.png)
+
+![Rooms in the sidebar](preview-sidebar.png)
 
 ## What you see
 
@@ -14,8 +17,16 @@ Every agent sits at a desk in its room, dressed for what it is doing.
 | Done | Confetti |
 | Idle | A starry nightcap |
 
-- **Six buildings.** School, apartment, hotel, submarine, rocket and castle.
-  Pick one from the header.
+- **Nine buildings.** School, office, apartment, hotel, submarine, rocket, castle,
+  ryokan and sento (a Japanese bathhouse). Pick one from the header.
+  Each has its own furniture: desks, a sofa, beds, consoles, low tables, bathtubs.
+- **Four towns.** Tokyo, Kyoto, Osaka and Mt. Fuji paint a sky and their landmarks over
+  the roof of any building: a radio tower, neon and a bullet train; a pagoda, maples and
+  a row of torii; a castle, a tower and a Ferris wheel; the mountain, cherry blossoms and a train.
+- **Side or top.** A button in the header moves the building between the sidebar and a
+  band across the top of the window, with the agent list beside it. Drag the borders to
+  change the band's height and the split.
+- **New spaces.** Right-click between the rooms, or press `+` in the header.
 - **Day and night.** The sky follows your local sunrise and sunset.
 - **One look per agent.** Claude Code, Codex, Crush, Kiro, Pi, Gemini, Cursor, OpenCode,
   Amp, Grok, Antigravity, Kimi, Qoder and Hermes each have their own occupant,
@@ -24,7 +35,8 @@ Every agent sits at a desk in its room, dressed for what it is doing.
 - **Hover and click.** Hover a room to see who is in it.
   Click to jump to the space or to the agent.
 
-The preview uses the `catppuccin-mocha` theme with a 480px sidebar.
+The previews use the `catppuccin-mocha` theme: `rooms-top` with a 460px band, and `rooms`
+with a 480px sidebar. The spaces and agents in them are made up.
 The layout itself follows your theme.
 
 ## Install
@@ -34,6 +46,7 @@ The layout itself follows your theme.
    | From this repo | To |
    |---|---|
    | `layouts/rooms.json` | `~/.config/herdr-app/layouts/` |
+   | `layouts/rooms-top.json` | `~/.config/herdr-app/layouts/` |
    | `mods/rooms/` | `~/.config/herdr-app/mods/` |
    | `mods/tabs-graph/` | `~/.config/herdr-app/mods/` |
    | `mods/agents-calm/` | `~/.config/herdr-app/mods/` |
@@ -54,6 +67,10 @@ The layout itself follows your theme.
 - The right-click menu on a room runs `git`, `gh browse`, `open` and `pbcopy`,
   so it works on macOS only.
   Nothing else runs programs or reaches the network.
+- Keys can drive it: bind `rooms.next-building`, `rooms.next-town`, `rooms.toggle-empty`
+  or `rooms.toggle-place` in `keys.json`, or run them with `herdr-app do`.
+- The side/top button looks for the other layout by name: `<name>` and `<name>-top`.
+  Keep that pair if you rename them.
 - It is built to stay light. Every picture is a static SVG, and an occupant hops
   only for its first 3 seconds of work.
 - `agents-calm` and `pane-calm` are Herdr's own agent list and pane header

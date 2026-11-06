@@ -24,11 +24,11 @@
 // the panel redraws only when the size or columns picked for it change.
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, Popup } from "gpui-base";
-import { spaces, agents, run, theme, settings, props, openOverlay } from "herdr";
+import { spaces, agents, run, theme, settings, props, openOverlay, shared, setShared, layouts, window, nextCommand } from "herdr";
 import { session } from "./session.js";
-import { Menu, menuItems, menuHeight, probe, MENU_WIDTH } from "./menu.js";
+import { Menu, menuItems, blankItems, menuHeight, probe, probeBlank, MENU_WIDTH } from "./menu.js";
 import { sunTimes } from "./sun.js";
-import { BUILDING_LIST, look, BUILDINGS, rise, windowTop, windowSides, backdrop, windowUnder, rivets } from "./looks.js";
+import { BUILDING_LIST, TOWNS, skyline, townSky, look, BUILDINGS, rise, windowTop, windowSides, backdrop, windowUnder, rivets } from "./looks.js";
 
 // What was picked when looks were stored by position.
 const OLD_LOOKS = ["school", "school", "apartment", "hotel", "submarine", "rocket", "castle"];
@@ -65,6 +65,19 @@ function body(a) {
   return BODIES.find((b) => b !== "pi" && k.startsWith(b)) ?? (k === "pi" ? "pi" : "other");
 }
 const status = (a) => a.status ?? "idle";
+
+// The layout with the building on the other side: "<name>-top" across the window's top,
+// "<name>" as a sidebar. Null when that layout isn't installed.
+function otherLayout() {
+  const name = String(shared("layout") ?? "");
+  if (!name) return null;
+  const other = name.endsWith("-top") ? name.slice(0, -4) : `${name}-top`;
+  return layouts().includes(other) ? other : null;
+}
+
+// In the strip across the top the block drags the window (`window_drag`), so a press
+// on anything that acts stops there.
+const keep = (el) => el.on_mouse_down("left", (_e, cx) => cx.stop_propagation());
 // The same agent keeps the same hat color.
 const sprite = (a) => `mods/rooms/sprites/${body(a)}-${pick(ACC, a.address)}-${status(a)}.svg`;
 
@@ -79,6 +92,8 @@ export default class Rooms extends View {
   init(_props, cx) {
     // This mod also draws a room's right-click menu, as a popup.
     if (props()?.role === "menu") { this.part = new Menu(); this.part.init(cx); return; }
+    // { strip: true }: the building across the window's top (layouts/rooms-top.json).
+    this.strip = Boolean(props()?.strip);
     this.building = "school";
     try {
       const b = localStorage.getItem("building");
@@ -86,6 +101,14 @@ export default class Rooms extends View {
     } catch {}
     this.folded = false;
     try { this.folded = localStorage.getItem("fold") === "1"; } catch {}
+    this.town = "";
+    try { const tw = localStorage.getItem("town"); if (TOWNS.some((x) => x.key === tw)) this.town = tw; } catch {}
+    // Before shared values held them, each copy kept its own: the copy that has one seeds them.
+    try {
+      if (shared("rooms.building") == null && localStorage.getItem("building")) setShared("rooms.building", this.building);
+      if (shared("rooms.fold") == null && localStorage.getItem("fold") != null) setShared("rooms.fold", this.folded);
+      if (shared("rooms.town") == null && localStorage.getItem("town") != null) setShared("rooms.town", this.town);
+    } catch {}
     // Day or night by the clock: checked once a minute, redrawn only when it turns.
     this.time = this.timeNow();
     cx.timer.every(60000, (cx) => { const now = this.timeNow(); if (now !== this.time) { this.time = now; cx.notify(); } });
@@ -110,23 +133,61 @@ export default class Rooms extends View {
     this.started = null;
     this.hopping = () => false;
     cx.timer.every(320, (cx) => { if (this.busy) { this.step ^= 1; cx.notify(); } });
+    // Commands for keys.json ("rooms.next-building", "rooms.next-town", "rooms.toggle-empty",
+    // "rooms.toggle-place") and `herdr-app do`.
+    cx.spawn(async (cx) => {
+      for (;;) {
+        const c = await nextCommand();
+        if (c === "next-town") {
+          const i = TOWNS.findIndex((x) => x.key === this.town);
+          this.setTown(TOWNS[(i + 1) % TOWNS.length].key);
+        } else if (c === "next-building") {
+          const i = BUILDING_LIST.findIndex((b) => b.key === this.building);
+          this.setBuilding(BUILDING_LIST[(i + 1) % BUILDING_LIST.length].key);
+        } else if (c === "toggle-empty") {
+          this.setFolded(!this.folded);
+        } else if (c === "toggle-place") {
+          const other = otherLayout();
+          if (other) run("layout.switch", { name: other });
+        }
+        cx.notify();
+      }
+    });
   }
 
+  // Kept in shared values too: localStorage is per props, and the sidebar and the strip
+  // across the top (props { strip }) should show the same building.
   setBuilding(building) {
     this.building = building;
+    setShared("rooms.building", building);
     try { localStorage.setItem("building", building); } catch {}
+  }
+
+  setTown(town) {
+    this.town = town;
+    setShared("rooms.town", town);
+    try { localStorage.setItem("town", town); } catch {}
   }
 
   setFolded(folded) {
     this.folded = folded;
+    setShared("rooms.fold", folded);
     try { localStorage.setItem("fold", folded ? "1" : "0"); } catch {}
+  }
+
+  // What the other copy picked since this one started.
+  follow() {
+    const b = shared("rooms.building"), f = shared("rooms.fold"), tw = shared("rooms.town");
+    if (BUILDING_LIST.some((x) => x.key === b)) this.building = b;
+    if (TOWNS.some((x) => x.key === tw)) this.town = tw;
+    if (typeof f === "boolean") this.folded = f;
   }
 
   // The plate over the rooms without agents: a press folds them away or shows them.
   // While folded it is outlined if the space you are in is among them.
   foldPlate(empty, p, t) {
     const here = this.folded && empty.some((s) => s.active);
-    return h_flex().id("fold").h(17).px(6).gap(4).items_center().cursor_pointer()
+    return keep(h_flex().id("fold")).h(17).px(6).gap(4).items_center().cursor_pointer()
       .bg(p.plate).border(1).border_color(here ? t.accent : p.ink)
       .text_size(10.5).font_semibold().text_color(p.ink).hover((st) => st.opacity(0.85))
       .on_click((_e, cx) => { this.setFolded(!this.folded); cx.notify(); })
@@ -150,7 +211,9 @@ export default class Rooms extends View {
     const kDef = Math.max(2, Math.round(3.2 * z)), kMin = Math.max(2, Math.ceil(kDef / 2));
     const colsDef = Math.max(1, Math.floor(Wz / 125));
     let best = null;
-    for (let k = kDef; k >= kMin; k--) {
+    // Across the top the band is short and wide: the art may grow past the usual size to fill it.
+    const kTop = this.strip ? Math.round(kDef * 1.5) : kDef;
+    for (let k = kTop; k >= kMin; k--) {
       const u = k / (2 * z), side = 8 + inset * u + 7 * u, gap = 5 * u;
       const colsHi = Math.max(colsDef, Math.floor((W - 2 * side + gap) / (MIN_TILE + gap)));
       const order = [colsDef];
@@ -214,28 +277,53 @@ export default class Rooms extends View {
     });
   }
 
-  // Day/Night follows the clock; the building opens a list under it.
+  // Day/Night follows the clock; the building opens a list under it; + makes a space;
+  // the last button moves the building to the window's top or back to the side.
   controls(t) {
-    const label = (id) => h_flex().id(id).h(20).px(6).gap(5).items_center().rounded(5).cursor_pointer()
+    const label = (id) => keep(h_flex().id(id)).h(20).px(6).gap(5).items_center().rounded(5).cursor_pointer()
       .text_size(11).text_color(t.muted).hover((st) => st.bg(t.hover).text_color(t.foreground));
+    const button = (id, icon, tip, action) => keep(h_flex().id(id)).size(20).flex_none().items_center().justify_center().rounded(5)
+      .cursor_pointer().text_color(t.muted).hover((st) => st.bg(t.hover).text_color(t.foreground))
+      .tooltip(tip).on_click(action).child(svg(icon).size(13));
+    const other = otherLayout();
     const time = h_flex().id("time").h(20).px(6).gap(5).items_center().text_size(11).text_color(t.dim)
       .tooltip(`Sunrise ${clock(this.sun[0])} · Sunset ${clock(this.sun[1])}`)
       .child(svg(`mods/rooms/icons/time-${this.time}.svg`).size(11)).child(this.time === "night" ? "Night" : "Day");
-    const name = BUILDING_LIST.find((b) => b.key === this.building)?.name ?? "";
+    const town = this.town ? TOWNS.find((x) => x.key === this.town)?.name : "";
+    const name = (BUILDING_LIST.find((b) => b.key === this.building)?.name ?? "") + (town ? ` · ${town}` : "");
     const trigger = label("building").when(this.picking, (el) => el.bg(t.selected).text_color(t.foreground))
       .on_hover((h, cx) => { this.overPick = h; if (!h) this.closePickSoon(cx); })
       .on_click((_e, cx) => { this.picking = !this.picking; cx.notify(); })
       .child(name).child(svg("mods/workspace-chrome/chevron-down.svg").size(11));
-    const list = v_flex().id("building-list").w(150).p(4).gap(1).bg(t.popover).rounded(8).border(1).border_color(t.border)
+    // The buildings, then the towns they can stand in.
+    const item = (id, label, on, pickIt) => h_flex().id(id).h(26).px(8).gap(6).items_center().rounded(5).cursor_pointer()
+      .text_size(12).text_color(t.foreground).hover((st) => st.bg(t.hover))
+      .on_click((_e, cx) => { pickIt(); this.picking = false; cx.notify(); })
+      .child(div().flex_1().child(label))
+      .when(on, (el) => el.child(svg("mods/workspace-chrome/check.svg").size(12).text_color(t.accent)));
+    const list = keep(v_flex().id("building-list")).w(150).p(4).gap(1).bg(t.popover).rounded(8).border(1).border_color(t.border)
       .on_hover((h, cx) => { this.overList = h; if (!h) this.closePickSoon(cx); })
-      .children(BUILDING_LIST.map((b) => h_flex().id(`building-${b.key}`).h(26).px(8).gap(6).items_center().rounded(5).cursor_pointer()
-        .text_size(12).text_color(t.foreground).hover((st) => st.bg(t.hover))
-        .on_click((_e, cx) => { this.setBuilding(b.key); this.picking = false; cx.notify(); })
-        .child(div().flex_1().child(b.name))
-        .when(b.key === this.building, (el) => el.child(svg("mods/workspace-chrome/check.svg").size(12).text_color(t.accent)))));
+      .children(BUILDING_LIST.map((b) => item(`building-${b.key}`, b.name, b.key === this.building, () => this.setBuilding(b.key))))
+      .child(div().mx(6).my(3).h(1).bg(t.border))
+      .child(div().px(8).h(18).text_size(10.5).text_color(t.dim).child("Town"))
+      .children(TOWNS.map((x) => item(`town-${x.key || "none"}`, x.name, x.key === this.town, () => this.setTown(x.key))));
     return h_flex().gap(2).items_center()
       .child(time)
-      .child(Popup.new("building-pop", trigger).anchor("top_right").when(this.picking, (el) => el.content(list)));
+      .child(Popup.new("building-pop", trigger).anchor("top_right").when(this.picking, (el) => el.content(list)))
+      .child(button("new-space", "mods/workspace-chrome/plus.svg", "New space", () => run("space.new")))
+      .when(Boolean(other), (el) => el.child(this.strip
+        ? button("to-side", "mods/workspace-chrome/sidebar.svg", "Building in the sidebar", () => run("layout.switch", { name: other }))
+        : button("to-top", "mods/rooms/icons/panel-top.svg", "Building across the top", () => run("layout.switch", { name: other }))));
+  }
+
+  // The menu between the rooms: a new space, empty or with an agent.
+  openBlankMenu(cx) {
+    this.open = null;
+    cx.notify();
+    cx.spawn(async () => {
+      const info = await probeBlank();
+      openOverlay({ mod: "rooms", kind: "popup", width: MENU_WIDTH, height: menuHeight(blankItems(info)), props: { role: "menu", info } });
+    });
   }
 
   // A short rest opens a roster; leaving both window and roster closes it, after a
@@ -278,21 +366,38 @@ export default class Rooms extends View {
       .child(svg(`mods/rooms/icons/${waits ? "warn" : "check"}.svg`).size(12).text_color("#ffffff"));
   }
 
-  // An occupant sitting at a desk: the desk hides its legs, its arms rest on it.
+  // An occupant at the building's furniture (looks.js `seat`), which hides it below
+  // the shoulders: a desk, a sofa, a bed's quilt, a low table or a bath.
   // A working one hops between two spots on each step of the timer (see init).
   seat(a, p, c, dim) {
     const { u } = this;
     const kid = image(sprite(a, p)).w(19 * u).h(15 * u).when(dim, (el) => el.opacity(0.8));
     const hop = this.hopping(a) ? (this.step ? 1 : -1) : 0;
-    return div().relative().w(22 * u).h(17 * u).flex_none()
-      .child(div().absolute().top(hop > 0 ? -2 * u : 0).left(1.5 * u + hop * u).child(kid))
-      .child(div().absolute().top(11 * u).left(2.5 * u).w(17 * u).h(2 * u).bg(p.deskTop))
-      .child(div().absolute().top(13 * u).left(3.5 * u).w(15 * u).h(2 * u).bg(p.desk))
-      .child(div().absolute().top(15 * u).left(4 * u).w(u).h(2 * u).bg(p.leg))
-      .child(div().absolute().top(15 * u).left(17 * u).w(u).h(2 * u).bg(p.leg))
-      .when(Boolean(p.win.lights), (el) => el
-        .child(div().absolute().top(13.5 * u).left(7 * u).size(u).bg(p.lights[0]))
-        .child(div().absolute().top(13.5 * u).left(10 * u).size(u).bg(p.lights[1])));
+    const box = (top, left, w, h, bg) => div().absolute().top(top * u).left(left * u).w(w * u).h(h * u).bg(bg);
+    const out = div().relative().w(22 * u).h(17 * u).flex_none()
+      .child(div().absolute().top(hop > 0 ? -2 * u : 0).left(1.5 * u + hop * u).child(kid));
+    switch (p.seat) {
+      case "sofa":
+        return out.child(box(10, 1, 3, 7, p.desk)).child(box(10, 18, 3, 7, p.desk))
+          .child(box(11, 4, 14, 3, p.deskTop)).child(box(14, 1, 20, 2, p.desk))
+          .child(box(16, 3, 1, 1, p.leg)).child(box(16, 18, 1, 1, p.leg));
+      case "bed":
+        return out.child(box(10, 1, 20, 7, p.deskTop)).child(box(10, 1, 20, 1, p.desk)).child(box(13, 1, 20, 1, p.desk))
+          .child(box(16, 0, 22, 1, p.leg));
+      case "low":
+        return out.child(box(12, 2, 18, 5, p.cushion)).child(box(13, 4, 14, 1.5, p.deskTop))
+          .child(box(14.5, 5, 12, 1, p.desk)).child(box(15.5, 6, 1, 1.5, p.leg)).child(box(15.5, 15, 1, 1.5, p.leg))
+          .child(box(12, 13, 2, 1, p.cup));
+      case "tub":
+        return out.child(box(10.5, 1, 20, 1.5, p.water)).child(box(12, 1, 20, 5, p.water).opacity(0.85))
+          .child(box(10, 0, 1.5, 7, p.deskTop)).child(box(10, 20.5, 1.5, 7, p.deskTop))
+          .child(box(16, 0, 22, 1, p.desk)).child(box(13, 1.5, 19, 0.5, p.desk));
+      default:
+        return out
+          .child(box(11, 2.5, 17, 2, p.deskTop)).child(box(13, 3.5, 15, 2, p.desk))
+          .child(box(15, 4, 1, 2, p.leg)).child(box(15, 17, 1, 2, p.leg))
+          .when(Boolean(p.win.lights), (el) => el.child(box(13.5, 7, 1, 1, p.lights[0])).child(box(13.5, 10, 1, 1, p.lights[1])));
+    }
   }
 
   // A room: its name plate over a window dressed by the building (looks.js), its
@@ -321,10 +426,11 @@ export default class Rooms extends View {
       .when(Boolean(w.rivets), (el) => el.children(rivets(p, u)));
     const b = this.badge(list, t);
     const under = windowUnder(w.under, c, u, hash(s.id) % 3 === 0);
-    const trigger = v_flex().id(`room-${s.id}`).relative().w_full().gap(2 * u).cursor_pointer()
+    const trigger = keep(v_flex().id(`room-${s.id}`)).relative().w_full().gap(2 * u).cursor_pointer()
       .on_hover((h, cx) => (h ? this.enter(s.id, cx) : this.leave(s.id, cx)))
       .on_click(() => run("space.select", { id: s.id }))
-      .on_mouse_down("right", (_e, cx) => this.openMenu(s, cx))
+      // Stopped here: between the rooms a right-click opens the building's menu instead.
+      .on_mouse_down("right", (_e, cx) => { cx.stop_propagation(); this.openMenu(s, cx); })
       .child(plate)
       .child(v_flex().w_full().child(b ? frame.child(b) : frame).when(Boolean(under), (el) => el.child(under)));
     return Popup.new(`pop-${s.id}`, trigger).anchor("top_left")
@@ -335,7 +441,7 @@ export default class Rooms extends View {
     const head = h_flex().gap(6).items_center().pb(6).border_b(1).border_color(t.border)
       .child(div().flex_1().min_w(0).truncate().text_size(12.5).font_semibold().text_color(t.foreground).child(s.name || "—"))
       .when(Boolean(s.branch), (el) => el.child(div().max_w(120).truncate().text_size(11).text_color(t.dim).child(s.branch)));
-    const row = (a) => h_flex().id(`st-${a.address}`).py(4).px(6).gap(8).items_center().rounded(6).cursor_pointer()
+    const row = (a) => keep(h_flex().id(`st-${a.address}`)).py(4).px(6).gap(8).items_center().rounded(6).cursor_pointer()
       .hover((st) => st.bg(t.hover))
       .on_click(() => run("pane.focus", { pane: a.pane }))
       .child(image(sprite(a, p)).w(19 * this.uDef).h(15 * this.uDef).flex_none())
@@ -350,7 +456,8 @@ export default class Rooms extends View {
 
   render(cx) {
     if (this.part) return this.part.render(cx);
-    const t = theme(), p = look(this.building, this.time), house = BUILDINGS[p.kind];
+    this.follow();
+    const t = theme(), p = look(this.building, this.time, this.town), house = BUILDINGS[p.kind];
     // One pixel of the art is a whole number of screen pixels (4 on a 2x screen at the
     // usual size), so it stays crisp. The roster keeps the usual size.
     const z = settings()?.zoom ?? 1;
@@ -403,7 +510,10 @@ export default class Rooms extends View {
       .when(empty.length > 0 && !this.folded, (el) => el.children(floorsOf(empty).map((r, i) => floor(`empty-${i}`, r))));
 
     // The counts, then the controls; they go under the counts when the sidebar is narrow.
-    const header = h_flex().flex_wrap().justify_between().px(12).pt(8).pb(6).gap_x(12).gap_y(4).items_center()
+    // Across the top, the header starts right of the macOS traffic lights.
+    const w = window();
+    const lights = this.strip && w?.platform === "macos" && !w?.fullscreen;
+    const header = h_flex().flex_wrap().justify_between().px(12).when(lights, (el) => el.pl(76)).pt(8).pb(6).gap_x(12).gap_y(4).items_center()
       .child(h_flex().h(20).gap(10).text_size(10.5).text_color(t.dim)
         .children(["blocked", "done", "working", "idle"].map((k) =>
           h_flex().gap(4).items_center().child(div().size(6).rounded(3).bg(t[k] ?? t.dim)).child(`${LABEL[k]} ${count[k]}`))))
@@ -413,6 +523,8 @@ export default class Rooms extends View {
       .child(header)
       .child(v_flex().id("building").flex_1().min_h(0).overflow_y_scrollbar()
         .on_size_change((size, cx) => this.resized(size, cx))
-        .child(v_flex().w_full().px(8).pb(10).child(house.crown(p, u, ins)).child(wall).child(house.base(p, u, ins))));
+        .on_mouse_down("right", (_e, cx) => this.openBlankMenu(cx))
+        .child(v_flex().w_full().px(8).pb(10).when(Boolean(p.town), (el) => el.child(skyline(p, u, (this.box?.width ?? 268) / z)))
+          .child(p.town ? v_flex().w_full().bg(townSky(p)[1]).child(house.crown(p, u, ins)) : house.crown(p, u, ins)).child(wall).child(house.base(p, u, ins))));
   }
 }

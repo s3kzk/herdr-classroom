@@ -6,7 +6,7 @@
 cd ~/.config/herdr-app/mods/rooms
 python3 -I tools/occupants.py sprites   # 住人（15 体 × 小物 4 色 × 4 状態 = 240 枚）
 python3 -I tools/scene.py icons        # 校舎（school）の時計塔・木・空の飾り（昼・夜）
-python3 -I tools/buildings.py .        # ほかの 5 つの建物の絵と art.js
+python3 -I tools/buildings.py .        # ほかの 8 つの建物と 4 つの街の絵と art.js
 ```
 
 - `buildings.py` は最後に走らせる。`icons/` にある SVG をすべて数えて、大きさを `art.js` に書くため。

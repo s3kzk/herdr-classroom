@@ -1,5 +1,6 @@
 // A room's right-click menu, opened as a popup overlay of this mod
-// (props { role: "menu", space }). ↑/↓ move, Enter runs, Esc closes.
+// (props { role: "menu", space }), or the building's between the rooms
+// (props { role: "menu", info: { blank: true, agent } }). ↑/↓ move, Enter runs, Esc closes.
 // An item is { label, icon, run, line? }; `line` draws a separator above it.
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
@@ -47,6 +48,21 @@ export function menuItems(s, { folder, git, agent }) {
   return list;
 }
 
+// What the menu offers between the rooms: a new space, empty or with the agent picked most.
+// Its folder is the focused terminal's, as with Herdr's own New space.
+export function blankItems({ agent }) {
+  return [
+    { label: "New space", icon: "plus", run: () => run("space.new") },
+    ...(agent ? [{ label: `New space with ${agent.name}`, icon: "terminal", run: () => run("space.new", { argv: agent.run }) }] : []),
+  ];
+}
+
+export async function probeBlank() {
+  const list = await knownAgents().catch(() => []);
+  const a = list.find((x) => x.installed);
+  return { blank: true, agent: a ? { name: a.name, run: a.run } : null };
+}
+
 // What the menu needs to know before it opens (its height depends on it): the
 // space's folder, whether it is a git checkout, and the agent picked most.
 export async function probe(s) {
@@ -67,7 +83,9 @@ export class Menu {
   }
 
   items() {
-    const p = props() ?? {}, s = spaces().find((x) => x.id === p.space);
+    const p = props() ?? {};
+    if (p.info?.blank) return blankItems(p.info);
+    const s = spaces().find((x) => x.id === p.space);
     return s ? menuItems(s, p.info ?? {}) : [];
   }
 
